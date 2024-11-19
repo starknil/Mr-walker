@@ -12,7 +12,7 @@ const USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 
 
 
-async function estimateTransactionCost(address, amount) {
+async function estimateTransactionCost(tronWeb, address, amount) {
   try {
 
     const amountInSun = amount * 1000000; //tronWeb.toBigNumber(amount).times(1e6);
@@ -67,15 +67,19 @@ app.post('/send/usdt', async (req, res) => {
   try {
     
     
-    const enoughFees = await estimateTransactionCost(address, amount);
-
-    if (enoughFees !== true){
-      return res.status(500).json({ success: false, error: "Not enough fee or Energy" });
-    }
+    
     const tronWeb = new TronWeb({
       fullHost: 'https://api.trongrid.io',
       privateKey
     });
+    
+    
+    const enoughFees = await estimateTransactionCost(tronWeb, address, amount);
+
+    if (enoughFees !== true){
+      return res.status(500).json({ success: false, error: "Not enough fee or Energy" });
+    }
+    
     
     const amountInSun = amount * 1000000; //tronWeb.toBigNumber(amount).times(1e6);
 
