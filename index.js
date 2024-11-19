@@ -31,7 +31,7 @@ app.post('/send/usdt', async (req, res) => {
       privateKey
     });
     
-    const amountInSun = tronWeb.toBigNumber(amount).times(1e6);
+    const amountInSun = amount * 1000000; //tronWeb.toBigNumber(amount).times(1e6);
 
     const contract = await tronWeb.contract().at(USDT_CONTRACT);
 
