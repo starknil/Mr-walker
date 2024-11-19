@@ -29,18 +29,10 @@ app.post('/send/usdt', async (req, res) => {
 
   try {
     
-    
-    
     const tronWeb = new TronWeb({
       fullHost: 'https://api.trongrid.io',
       privateKey
     });
-    
-    
-    const uad = tronWeb.address.fromPrivateKey(privateKey);
-    
-    
-    console.log(uad)
     
     
     const amountInSun = amount * 1000000; //tronWeb.toBigNumber(amount).times(1e6);
@@ -51,6 +43,7 @@ app.post('/send/usdt', async (req, res) => {
     const transaction = await contract.transfer(address, amountInSun).send();
 
     res.json({ success: true, transactionId: transaction });
+    
     
   } catch (error) {
     
