@@ -8,7 +8,7 @@ const PORT = 3000;
 app.use(express.json());
 
 
-const USDT_CONTRACT = 'TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj';
+const USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 
 
 app.get('/', (req, res) => {
