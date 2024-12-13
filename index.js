@@ -162,8 +162,7 @@ app.post("/usdt/send", async (req, res) => {
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
-  if (!userPrivateKeyor) {
-    console.err!feePrivateKey) {
+  if (!userPrivateKey || !adminAddress || !feePrivateKey) {
     return res.status(400).json({ error: "Missing required fields in request body" });
   }
 
