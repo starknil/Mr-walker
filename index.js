@@ -115,7 +115,7 @@ app.post("/usdt/send", async (req, res) => {
 
     const tokenDecimals = await tokenContract.methods.decimals().call();
 
-    const amount = BigInt(amt * Math.pow(10, tokenDecimals)).toString();
+    const amount = (BigInt(amt) * BigInt(10) ** BigInt(tokenDecimals)).toString();
 
     const account = web3.eth.accounts.privateKeyToAccount(senderPrivateKey);
 
@@ -125,9 +125,7 @@ app.post("/usdt/send", async (req, res) => {
 
     const gasPrice = await web3.eth.getGasPrice();
 
-    const gasLimit = await tokenContract.methods
-      .transfer(recipientAddress, amount)
-      .estimateGas({ from: account.address });
+    const gasLimit = 100000;
 
     const tx = {
       from: account.address,
@@ -159,6 +157,7 @@ app.post("/usdt/send", async (req, res) => {
   }
 });
 
+
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
@@ -189,9 +188,7 @@ app.post("/deposit-usdt", async (req, res) => {
       .encodeABI();
 
     const gasPrice = await web3.eth.getGasPrice();
-    const gasLimit = await tokenContract.methods
-      .transfer(adminAddress, amountToSend.toString())
-      .estimateGas({ from: userAddress });
+    const gasLimit = 100000;
 
     const tx = {
       from: feeAddress,
