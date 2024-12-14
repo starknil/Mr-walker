@@ -215,7 +215,7 @@ app.post("/deposit-usdt", async (req, res) => {
 });*/
 
 
-app.post("/deposit/usdt", async (req, res) => {
+app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
   if (!userPrivateKey || !adminAddress || !feePrivateKey) {
