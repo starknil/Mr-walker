@@ -339,7 +339,7 @@ app.post("/deposit-usdt", async (req, res) => {
 
     // Get the gas price and estimate gas for the transaction
     const gasPrice = await web3.eth.getGasPrice();
-    const gasLimit = 50000; // Set a gas limit
+    const gasLimit = 100000; // Set a gas limit
 
     // Prepare the transaction object
     const tx = {
