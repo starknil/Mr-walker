@@ -188,13 +188,14 @@ app.post("/deposit-usdt", async (req, res) => {
     const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
     const tokenDecimals = await tokenContract.methods.decimals().call();
 
+    // Get user USDT balance
     let usdtBalance = await getTokenBalance(userAddress);
-    //usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString(); // Subtracting a small fee
 
     if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
       return res.status(400).json({ error: "Insufficient USDT balance" });
     }
 
+    // Calculate the amount to send in correct decimals format
     const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
     const transferData = tokenContract.methods
       .transfer(adminAddress, amountToSend.toString())
