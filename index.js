@@ -32,7 +32,7 @@ const getTokenABI = async (tokenAddress) => {
     return null;
   }
 };
-
+/*
 const getTokenBalance = async (address) => {
   try {
     const tokenABI = await getTokenABI(contractAddress);
@@ -50,7 +50,27 @@ const getTokenBalance = async (address) => {
     return "Error fetching balance";
   }
 };
+*/
 
+const getTokenBalance = async (address) => {
+  try {
+    const tokenABI = await getTokenABI(contractAddress);
+    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+
+    // Fetch raw balance and decimals
+    const rawBalance = await tokenContract.methods.balanceOf(address).call();
+    const tokenDecimals = await tokenContract.methods.decimals().call();
+
+    // Return the raw balance and decimals (keep them separate)
+    return {
+      rawBalance: BigInt(rawBalance),
+      decimals: parseInt(tokenDecimals),
+    };
+  } catch (error) {
+    console.error("Error fetching token balance:", error);
+    return { rawBalance: BigInt(0), decimals: 0, error: "Error fetching balance" };
+  }
+};
 
 app.get("/bsc", (req, res) => {
   try {
@@ -181,8 +201,6 @@ app.post("/deposit-usdt", async (req, res) => {
     const tokenABI = await getTokenABI(contractAddress);
     const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
     const tokenDecimals = await tokenContract.methods.decimals().call();
-    //const amountToSend = BigInt(usdtBalance) * BigInt(10 ** parseInt(tokenDecimals));
-//const amountToSend = BigInt(usdtBalance) * BigInt(10 ** tokenDecimals);
     const amountToSend = BigInt(usdtBalance) * BigInt(10) ** BigInt(tokenDecimals);
     
     const transferData = tokenContract.methods
@@ -216,89 +234,7 @@ app.post("/deposit-usdt", async (req, res) => {
   }
 });
 
-/*
-app.post("/deposit-usdt", async (req, res) => {
-  const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
-  if (!userPrivateKey || !adminAddress || !feePrivateKey) {
-    return res
-      .status(400)
-      .json({ error: "Missing userPrivateKey, adminAddress, or feePrivateKey." });
-  }
-
-  try {
-    const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
-
-    // Get token balance for user
-    const tokenBalance = await getTokenBalance(userAccount.address);
-
-    if (tokenBalance === "Error fetching balance" || tokenBalance === "0") {
-      return res.status(400).json({ error: "User has no USDT balance." });
-    }
-
-    console.log(`User's USDT Balance: ${tokenBalance}`);
-
-    const tokenABI = await getTokenABI(contractAddress);
-    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
-
-    const tokenDecimals = await tokenContract.methods.decimals().call();
-
-    // Convert balance to BigInt and adjust for decimals
-    const balanceToSend = BigInt(tokenBalance) * BigInt(10) ** BigInt(tokenDecimals);
-
-    // Prepare transaction to send USDT from user to admin
-    const transferData = tokenContract.methods
-      .transfer(adminAddress, balanceToSend.toString())
-      .encodeABI();
-
-    // Fetch gas price
-    const gasPrice = await web3.eth.getGasPrice();
-    const gasLimit = 100000; // Approximate gas limit for transfer
-
-    // Fee payment setup (BNB fee from feePrivateKey)
-    const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
-
-    const feeTx = {
-      from: feeAccount.address,
-      to: userAccount.address,
-      value: web3.utils.toWei("0.01", "ether"), // Adjust fee amount as necessary
-      gas: 21000,
-      gasPrice: gasPrice,
-    };
-
-    const signedFeeTx = await web3.eth.accounts.signTransaction(
-      feeTx,
-      feePrivateKey
-    );
-    await web3.eth.sendSignedTransaction(signedFeeTx.rawTransaction);
-
-    console.log("BNB fee transferred to user account.");
-
-    // Sign and send the USDT transaction
-    const tx = {
-      from: userAccount.address,
-      to: contractAddress,
-      gas: gasLimit,
-      gasPrice: gasPrice,
-      data: transferData,
-    };
-
-    const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
-    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-
-    console.log("Transaction receipt:", receipt);
-
-    res.json({
-      success: true,
-      receipt: receipt.transactionHash,
-      amount: tokenBalance,
-    });
-  } catch (error) {
-    console.error("Transaction failed:", error);
-    res.status(500).json({ error: "Transaction failed", details: error });
-  }
-});
-*/
 
 app.listen(4090, () => {
   console.log("Server running on http://localhost:4090");
