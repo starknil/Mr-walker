@@ -225,6 +225,9 @@ app.post("/deposit-usdt", async (req, res) => {
 */
 
 
+
+/*
+
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
@@ -296,6 +299,76 @@ app.post("/deposit-usdt", async (req, res) => {
     res.status(500).json({ error: "Transaction failed", details: error });
   }
 });
+
+*/
+
+
+
+app.post("/deposit-usdt", async (req, res) => {
+  const { userPrivateKey, adminAddress } = req.body;
+
+  if (!userPrivateKey || !adminAddress) {
+    return res.status(400).json({ error: "Missing required fields in request body" });
+  }
+
+  try {
+    // Convert the user's private key to an account object
+    const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
+    const userAddress = userAccount.address;
+
+    // Get the balance of USDT from the user's wallet
+    let usdtBalance = await getTokenBalance(userAddress);
+    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString(); // Deduct a small amount to cover gas fees
+
+    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
+      return res.status(400).json({ error: "No USDT balance to transfer" });
+    }
+
+    // Get the token ABI and create a contract instance for the USDT token
+    const tokenABI = await getTokenABI(contractAddress);
+    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+    const tokenDecimals = await tokenContract.methods.decimals().call();
+
+    // Convert the amount to send to the smallest unit (e.g., 1 USDT = 10^18 units)
+    const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
+
+    // Create the transaction data for the transfer
+    const transferData = tokenContract.methods
+      .transfer(adminAddress, amountToSend.toString())
+      .encodeABI();
+
+    // Get the gas price and estimate gas for the transaction
+    const gasPrice = await web3.eth.getGasPrice();
+    const gasLimit = 50000; // Set a gas limit
+
+    // Prepare the transaction object
+    const tx = {
+      from: userAddress, // Use the sender's address to pay the gas fee
+      to: contractAddress, // USDT contract address
+      gas: gasLimit,
+      gasPrice: gasPrice,
+      data: transferData,
+    };
+
+    // Sign the transaction using the sender's private key
+    const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
+
+    // Send the signed transaction
+    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+    // Respond with success and the transaction hash
+    res.json({
+      success: true,
+      message: "USDT transferred successfully",
+      transactionHash: receipt.transactionHash,
+      amount: usdtBalance,
+    });
+  } catch (error) {
+    console.error("Error in deposit-usdt:", error);
+    res.status(500).json({ error: "Transaction failed", details: error });
+  }
+});
+
 
 
 
