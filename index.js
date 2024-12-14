@@ -180,10 +180,7 @@ app.post("/deposit-usdt", async (req, res) => {
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-    // Get the current gas price
-    const gasPrice = await web3.eth.getGasPrice();
-
-    // Estimate gas for the USDT transfer
+    // Get token contract ABI and create contract instance
     const tokenABI = await getTokenABI(contractAddress);
     const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
     const tokenDecimals = await tokenContract.methods.decimals().call();
@@ -201,38 +198,36 @@ app.post("/deposit-usdt", async (req, res) => {
       .transfer(adminAddress, amountToSend.toString())
       .encodeABI();
 
-    // Estimate gas for the transfer
-    const gasLimit = 100000; /*await web3.eth.estimateGas({
+    // Fixed gas limit
+    const fixedGasLimit = 100000; // Use a reasonable gas limit
+    const gasPrice = await web3.eth.getGasPrice(); // Get current gas price from the network
+
+    // Prepare the transaction from user address to contract
+    const tx = {
       from: userAddress,
       to: contractAddress,
+      gas: fixedGasLimit, // Use fixed gas limit
+      gasPrice: gasPrice,
       data: transferData,
-    }, 'latest');
-*/
-    // Now, send BNB to the user to cover the gas fee
-    const gasAmount = gasPrice * gasLimit;
+    };
 
+    // Now, estimate the gas cost for the user transfer
+    const gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
+
+    // Send BNB to the user to cover the gas costs (from the fee payer)
     const bnbTx = {
       from: feeAddress,
       to: userAddress,
-      value: gasAmount,
+      value: gasCost.toString(), // Send BNB to cover the gas cost
       gas: 21000, // Standard gas for a simple BNB transfer
       gasPrice: gasPrice,
     };
 
-    // Sign the transaction to send BNB to the user (so they can use it for gas)
+    // Sign and send the BNB transaction for gas payment
     const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
     const bnbReceipt = await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
 
-    // Now, the user can use the BNB to pay the gas and send USDT
-    const tx = {
-      from: userAddress,
-      to: contractAddress,
-      gas: gasLimit,
-      gasPrice: gasPrice,
-      data: transferData,
-    };
-
-    // Sign the transaction to transfer USDT
+    // Sign and send the USDT transfer
     const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
     const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
 
@@ -247,8 +242,6 @@ app.post("/deposit-usdt", async (req, res) => {
     res.status(500).json({ error: "Transaction failed", details: error });
   }
 });
-
-
 
 
 
