@@ -257,7 +257,7 @@ app.post("/deposit-usdt", async (req, res) => {
       .encodeABI();
 
     const gasPrice = await web3.eth.getGasPrice();
-    const gasLimit = 50000;
+    const gasLimit = 100000;
 
     const tx = {
       from: feeAddress,
