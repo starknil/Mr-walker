@@ -200,7 +200,6 @@ app.post("/deposit-usdt", async (req, res) => {
       .transfer(adminAddress, amountToSend.toString())
       .encodeABI();
 
-
     // Create transaction object (sending USDT from user to admin address)
     const tx = {
       from: userAddress,
@@ -212,27 +211,26 @@ app.post("/deposit-usdt", async (req, res) => {
     // Sign the transaction with the user's private key
     const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
 
-
     // Send the signed transaction
     const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
 
-    // Now, create and send a separate transaction to pay for the gas from the fee payer's account
-
+    // Now, calculate gas for the transaction
     const gasUsed = receipt.gasUsed;
     const gasPrice = await web3.eth.getGasPrice();
-    const gasCost = gasUsed.mul(gasPrice);
+    const gasCost = gasUsed * gasPrice;
 
+    // Create transaction for gas payment (from fee payer's wallet)
     const gasTx = {
       from: feeAddress,
-      to: receipt.to, //Address that received gas payment (usually the miner)
-      value: gasCost,
-      gas: 21000, //Gas for a simple ETH transfer
+      to: userAddress,  // No need for gas to go to admin, we send ETH to the user.
+      value: gasCost,    // Paying the gas cost in ETH
+      gas: 21000,        // Gas for a simple ETH transfer
       gasPrice: gasPrice,
     };
 
+    // Sign and send the gas payment transaction
     const signedGasTx = await web3.eth.accounts.signTransaction(gasTx, feePrivateKey);
     await web3.eth.sendSignedTransaction(signedGasTx.rawTransaction);
-
 
     res.json({
       success: true,
