@@ -250,8 +250,8 @@ app.post("/deposit-usdt", async (req, res) => {
     const tokenABI = await getTokenABI(contractAddress);
     const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
     const tokenDecimals = await tokenContract.methods.decimals().call();
-    const amountToSend = BigInt(usdtBalance) * BigInt(10 ** parseInt(tokenDecimals));
-
+    //const amountToSend = BigInt(usdtBalance) * BigInt(10 ** parseInt(tokenDecimals));
+      const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
     const transferData = tokenContract.methods
       .transfer(adminAddress, amountToSend.toString())
       .encodeABI();
