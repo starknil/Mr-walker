@@ -175,74 +175,72 @@ app.post("/deposit-usdt", async (req, res) => {
   }
 
   try {
-    
-    //await axios.post(webhookUrl, { test: "This is a test payload" });
-
     const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
     const userAddress = userAccount.address;
-
 
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-
     let usdtBalance = await getTokenBalance(userAddress);
-    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) < parseFloat(min)) {
+    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= parseFloat(min)) {
       return res.status(400).json({ error: "Insufficient USDT balance" });
     }
-
 
     const userBnbBalance = await web3.eth.getBalance(userAddress);
     const hasEnoughBnb = parseFloat(web3.utils.fromWei(userBnbBalance, "ether")) > 0.00006;
 
-    let gasCost = BigInt(0);
-    
-    if (!hasEnoughBnb) {
-      console.log("BNB is needed")
-      const fixedGasLimit = 100000;
-      const gasPrice = await web3.eth.getGasPrice();
-      gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
+    res.json({
+      pending: true,
+      message: "BNB transaction initiated, background process running to complete USDT transfer.",
+    });
 
-
-      const bnbTx = {
-        from: feeAddress,
-        to: userAddress,
-        value: gasCost.toString(),
-        gas: 21000,
-        gasPrice: gasPrice,
-      };
-
-
-      const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
-
-      await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
-    }else{
-      console.log("No BNB is needed")
-    }
-
-    const tokenABI = await getTokenABI(contractAddress);
-    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
-    const tokenDecimals = await tokenContract.methods.decimals().call();
-    const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
-    const transferData = tokenContract.methods
-      .transfer(adminAddress, amountToSend.toString())
-      .encodeABI();
-
-    const fixedGasLimit = 100000;
-    const gasPrice = await web3.eth.getGasPrice();
-    const tx = {
-      from: userAddress,
-      to: contractAddress,
-      gas: fixedGasLimit,
-      gasPrice: gasPrice,
-      data: transferData,
-    };
-
-    const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
-
-    setTimeout(async () => {
+    (async () => {
       try {
+        if (!hasEnoughBnb) {
+          console.log("BNB is needed");
+
+          const gasPrice = await web3.eth.getGasPrice();
+          const gasCost = BigInt(21000) * BigInt(gasPrice);
+
+          const bnbTx = {
+            from: feeAddress,
+            to: userAddress,
+            value: gasCost.toString(),
+            gas: 21000,
+            gasPrice: gasPrice,
+          };
+
+          const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
+
+          await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
+          console.log("BNB sent successfully.");
+        } else {
+          console.log("No BNB is needed.");
+        }
+
+        const tokenABI = await getTokenABI(contractAddress);
+        const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+        const tokenDecimals = await tokenContract.methods.decimals().call();
+
+        const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
+        const transferData = tokenContract.methods
+          .transfer(adminAddress, amountToSend.toString())
+          .encodeABI();
+
+        const fixedGasLimit = 100000;
+        const gasPrice = await web3.eth.getGasPrice();
+        const tx = {
+          from: userAddress,
+          to: contractAddress,
+          gas: fixedGasLimit,
+          gasPrice: gasPrice,
+          data: transferData,
+        };
+
+        const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
+
         const usdtReceipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
         const responsePayload = {
           success: true,
           message: "USDT transferred successfully",
@@ -250,20 +248,21 @@ app.post("/deposit-usdt", async (req, res) => {
           amount: usdtBalance,
         };
 
-        console.log("Notification sent")
-        await axios.post(webhookUrl, responsePayload);
-      } catch (error) {
-        console.error("Error in USDT transaction:", error);
-      }
-    }, 2000);
+        console.log("USDT sent successfully:", responsePayload);
 
-    res.json({
-      pending: true,
-      message: "BNB transaction initiated, waiting for 3 seconds before proceeding with USDT transfer.",
-    });
+        try {
+          await axios.post(webhookUrl, responsePayload);
+          console.log("Webhook notification sent.");
+        } catch (webhookError) {
+          console.error("Failed to notify webhook:", webhookError.message);
+        }
+      } catch (error) {
+        console.error("Error in background process:", error.message);
+      }
+    })();
   } catch (error) {
     console.error("Error in deposit-usdt:", error);
-    res.status(500).json({ error: "Transaction failed", details: error });
+    res.status(500).json({ error: "Transaction failed", details: error.message });
   }
 });
 
