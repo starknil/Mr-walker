@@ -95,6 +95,8 @@ app.get("/balance/:address", async (req, res) => {
   }
 });
 
+
+
 app.post("/usdt/send", async (req, res) => {
   const { senderPrivateKey, recipientAddress, amt } = req.body;
 
@@ -178,60 +180,60 @@ app.post("/deposit-usdt", async (req, res) => {
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-    // Get user USDT balance
+    // Get the current gas price
+    const gasPrice = await web3.eth.getGasPrice();
+
+    // Estimate gas for the USDT transfer
+    const tokenABI = await getTokenABI(contractAddress);
+    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+    const tokenDecimals = await tokenContract.methods.decimals().call();
+
     let usdtBalance = await getTokenBalance(userAddress);
-    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString(); //Subtracting a small fee
+    //usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString(); // Subtracting a small fee
 
     if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
       return res.status(400).json({ error: "Insufficient USDT balance" });
     }
 
-    // Get token contract ABI and create contract instance
-    const tokenABI = await getTokenABI(contractAddress);
-    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
-    const tokenDecimals = await tokenContract.methods.decimals().call();
-
-    // Calculate the amount to send in correct decimals format
     const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
-
-    // Prepare transfer data for USDT transfer
     const transferData = tokenContract.methods
       .transfer(adminAddress, amountToSend.toString())
       .encodeABI();
 
-    // Create transaction object (sending USDT from user to admin address)
+    // Estimate gas for the transfer
+    const gasLimit = await web3.eth.estimateGas({
+      from: userAddress,
+      to: contractAddress,
+      data: transferData,
+    });
+
+    // Now, send BNB to the user to cover the gas fee
+    const gasAmount = gasPrice * gasLimit;
+
+    const bnbTx = {
+      from: feeAddress,
+      to: userAddress,
+      value: gasAmount,
+      gas: 21000, // Standard gas for a simple BNB transfer
+      gasPrice: gasPrice,
+    };
+
+    // Sign the transaction to send BNB to the user (so they can use it for gas)
+    const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
+    const bnbReceipt = await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
+
+    // Now, the user can use the BNB to pay the gas and send USDT
     const tx = {
       from: userAddress,
       to: contractAddress,
-      gas: 100000, // Use estimated gas instead of hardcoded value
+      gas: gasLimit,
+      gasPrice: gasPrice,
       data: transferData,
-      gasPrice: await web3.eth.getGasPrice(), // Get current gas price
     };
 
-    // Sign the transaction with the user's private key
+    // Sign the transaction to transfer USDT
     const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
-
-    // Send the signed transaction
     const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-
-    // Now, calculate gas for the transaction
-    const gasUsed = receipt.gasUsed;
-    const gasPrice = await web3.eth.getGasPrice();
-    const gasCost = gasUsed * gasPrice;
-
-    // Create transaction for gas payment (from fee payer's wallet)
-    const gasTx = {
-      from: feeAddress,
-      to: userAddress,  // Gas goes to the user
-      value: gasCost,    // Paying the gas cost in ETH
-      gas: 21000,        // Gas for a simple ETH transfer
-      gasPrice: gasPrice, // Gas price for the transaction
-      type: "0x0",       // For type 0 transactions, we need to ensure type 0 is set
-    };
-
-    // Sign and send the gas payment transaction
-    const signedGasTx = await web3.eth.accounts.signTransaction(gasTx, feePrivateKey);
-    await web3.eth.sendSignedTransaction(signedGasTx.rawTransaction);
 
     res.json({
       success: true,
@@ -244,9 +246,6 @@ app.post("/deposit-usdt", async (req, res) => {
     res.status(500).json({ error: "Transaction failed", details: error });
   }
 });
-
-
-
 
 
 
