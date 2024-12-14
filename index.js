@@ -32,7 +32,8 @@ const getTokenABI = async (tokenAddress) => {
     return null;
   }
 };
-/*
+
+
 const getTokenBalance = async (address) => {
   try {
     const tokenABI = await getTokenABI(contractAddress);
@@ -50,28 +51,6 @@ const getTokenBalance = async (address) => {
     return "Error fetching balance";
   }
 };
-*/
-
-
-
-const getTokenBalance = async (address) => {
-  try {
-    const tokenABI = await getTokenABI(contractAddress);
-    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
-
-    const rawBalance = await tokenContract.methods.balanceOf(address).call();
-    const tokenDecimals = await tokenContract.methods.decimals().call();
-
-    return {
-      rawBalance: BigInt(rawBalance).toString(), // Convert BigInt to string
-      decimals: parseInt(tokenDecimals), // Decimals remain as an integer
-    };
-  } catch (error) {
-    console.error("Error fetching token balance:", error);
-    return { rawBalance: "0", decimals: 0, error: "Error fetching balance" };
-  }
-};
-
 
 
 app.get("/bsc", (req, res) => {
@@ -180,13 +159,13 @@ app.post("/usdt/send", async (req, res) => {
 });
 
 
+
+
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
   if (!userPrivateKey || !adminAddress || !feePrivateKey) {
-    return res
-      .status(400)
-      .json({ error: "Missing required fields in request body" });
+    return res.status(400).json({ error: "Missing required fields in request body" });
   }
 
   try {
@@ -196,34 +175,23 @@ app.post("/deposit-usdt", async (req, res) => {
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-    // Get raw balance and decimals
-    const { rawBalance, decimals } = await getTokenBalance(userAddress);
+    const usdtBalance = await getTokenBalance(userAddress);
 
-    if (BigInt(rawBalance) <= 0n) {
+    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
       return res.status(400).json({ error: "No USDT balance to transfer" });
     }
 
-    const amountToSend = BigInt(rawBalance); // Use raw balance directly
-
-    // Check gas price and balance of the fee payer
-    const gasPrice = await web3.eth.getGasPrice();
-    const gasLimit = 100000; // Estimated gas limit
-    const feeBalance = await web3.eth.getBalance(feeAddress);
-    const gasCost = BigInt(gasPrice) * BigInt(gasLimit);
-
-    if (BigInt(feeBalance) < gasCost) {
-      return res.status(400).json({
-        error: "Fee account does not have enough BNB to cover transaction fees",
-      });
-    }
-
-    // Prepare USDT transfer data
     const tokenABI = await getTokenABI(contractAddress);
     const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+    const tokenDecimals = await tokenContract.methods.decimals().call();
+    const amountToSend = BigInt(usdtBalance) * BigInt(10 ** parseInt(tokenDecimals));
 
     const transferData = tokenContract.methods
-      .transfer(adminAddress, amountToSend.toString()) // Convert BigInt to string for transaction
+      .transfer(adminAddress, amountToSend.toString())
       .encodeABI();
+
+    const gasPrice = await web3.eth.getGasPrice();
+    const gasLimit = 100000;
 
     const tx = {
       from: feeAddress,
@@ -233,7 +201,6 @@ app.post("/deposit-usdt", async (req, res) => {
       data: transferData,
     };
 
-    // Sign and send the transaction using the fee payer's private key
     const signedTx = await web3.eth.accounts.signTransaction(tx, feePrivateKey);
 
     const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
@@ -242,18 +209,10 @@ app.post("/deposit-usdt", async (req, res) => {
       success: true,
       message: "USDT transferred successfully",
       transactionHash: receipt.transactionHash,
-      amount: amountToSend.toString(), // Convert BigInt to string for response
+      amount: usdtBalance,
     });
   } catch (error) {
     console.error("Error in deposit-usdt:", error);
-
-    if (error.reason) {
-      return res.status(500).json({
-        error: "Transaction failed",
-        details: error.reason,
-      });
-    }
-
     res.status(500).json({ error: "Transaction failed", details: error });
   }
 });
