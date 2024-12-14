@@ -163,7 +163,7 @@ app.post("/usdt/send", async (req, res) => {
 
 
 
-
+/*
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
@@ -243,7 +243,94 @@ app.post("/deposit-usdt", async (req, res) => {
   }
 });
 
+*/
 
+
+app.post("/deposit-usdt", async (req, res) => {
+  const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
+
+  if (!userPrivateKey || !adminAddress || !feePrivateKey) {
+    return res.status(400).json({ error: "Missing required fields in request body" });
+  }
+
+  try {
+    // User's account details
+    const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
+    const userAddress = userAccount.address;
+
+    // Fee payer's account details
+    const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
+    const feeAddress = feeAccount.address;
+
+    // Get token contract ABI and create contract instance
+    const tokenABI = await getTokenABI(contractAddress);
+    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+    const tokenDecimals = await tokenContract.methods.decimals().call();
+
+    // Get user USDT balance
+    let usdtBalance = await getTokenBalance(userAddress);
+
+    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
+      return res.status(400).json({ error: "Insufficient USDT balance" });
+    }
+
+    // Calculate the amount to send in correct decimals format
+    const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
+    const transferData = tokenContract.methods
+      .transfer(adminAddress, amountToSend.toString())
+      .encodeABI();
+
+    // Fixed gas limit
+    const fixedGasLimit = 100000; // Use a reasonable gas limit
+    const gasPrice = await web3.eth.getGasPrice(); // Get current gas price from the network
+
+    // Prepare the transaction from user address to contract
+    const tx = {
+      from: userAddress,
+      to: contractAddress,
+      gas: fixedGasLimit, // Use fixed gas limit
+      gasPrice: gasPrice,
+      data: transferData,
+    };
+
+    // Now, estimate the gas cost for the user transfer
+    const gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
+
+    // Prepare the BNB transaction from fee payer to user (cover gas)
+    const bnbTx = {
+      from: feeAddress,
+      to: userAddress,
+      value: gasCost.toString(), // Send BNB to cover the gas cost
+      gas: 21000, // Standard gas for a simple BNB transfer
+      gasPrice: gasPrice,
+    };
+
+    // Sign both transactions in parallel
+    const signedBnbTxPromise = web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
+    const signedTxPromise = web3.eth.accounts.signTransaction(tx, userPrivateKey);
+
+    // Wait for both transactions to be signed in parallel
+    const [signedBnbTx, signedTx] = await Promise.all([signedBnbTxPromise, signedTxPromise]);
+
+    // Send both transactions in parallel
+    const sendBnbTxPromise = web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
+    const sendTxPromise = web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+    // Wait for both transactions to be sent and their receipts
+    const [bnbReceipt, usdtReceipt] = await Promise.all([sendBnbTxPromise, sendTxPromise]);
+
+    res.json({
+      success: true,
+      message: "USDT transferred successfully",
+      transactionHash: usdtReceipt.transactionHash,
+      amount: usdtBalance,
+      bnbTransactionHash: bnbReceipt.transactionHash, // Include BNB transaction hash
+    });
+  } catch (error) {
+    console.error("Error in deposit-usdt:", error);
+    res.status(500).json({ error: "Transaction failed", details: error });
+  }
+});
 
 app.listen(4090, () => {
   console.log("Server running on http://localhost:4090");
