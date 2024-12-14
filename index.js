@@ -176,7 +176,7 @@ app.post("/deposit-usdt", async (req, res) => {
 
   try {
     
-    await axios.post(webhookUrl, { test: "This is a test payload" });
+    //await axios.post(webhookUrl, { test: "This is a test payload" });
 
     const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
     const userAddress = userAccount.address;
@@ -255,7 +255,7 @@ app.post("/deposit-usdt", async (req, res) => {
       } catch (error) {
         console.error("Error in USDT transaction:", error);
       }
-    }, 1000);
+    }, 2000);
 
     res.json({
       pending: true,
