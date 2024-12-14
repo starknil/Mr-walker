@@ -239,8 +239,10 @@ app.post("/deposit-usdt", async (req, res) => {
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-    const usdtBalance = await getTokenBalance(userAddress);
-
+    let usdtBalance = await getTokenBalance(userAddress);
+    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString();
+    
+    
     if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
       return res.status(400).json({ error: "No USDT balance to transfer" });
     }
