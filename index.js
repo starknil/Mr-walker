@@ -204,7 +204,7 @@ app.post("/deposit-usdt", async (req, res) => {
     const tx = {
       from: userAddress,
       to: contractAddress,
-      gas: 100000, // Consider using gas estimation instead of a fixed value
+      gas: 100000, // Use estimated gas instead of hardcoded value
       data: transferData,
     };
 
@@ -222,10 +222,10 @@ app.post("/deposit-usdt", async (req, res) => {
     // Create transaction for gas payment (from fee payer's wallet)
     const gasTx = {
       from: feeAddress,
-      to: userAddress,  // No need for gas to go to admin, we send ETH to the user.
+      to: userAddress,  // Gas goes to the user
       value: gasCost,    // Paying the gas cost in ETH
       gas: 21000,        // Gas for a simple ETH transfer
-      gasPrice: gasPrice,
+      gasPrice: gasPrice, // Gas price for the transaction
     };
 
     // Sign and send the gas payment transaction
@@ -243,6 +243,8 @@ app.post("/deposit-usdt", async (req, res) => {
     res.status(500).json({ error: "Transaction failed", details: error });
   }
 });
+
+
 
 
 
