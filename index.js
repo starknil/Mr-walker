@@ -162,7 +162,6 @@ app.post("/usdt/send", async (req, res) => {
 
 
 
-
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
@@ -206,6 +205,7 @@ app.post("/deposit-usdt", async (req, res) => {
       to: contractAddress,
       gas: 100000, // Use estimated gas instead of hardcoded value
       data: transferData,
+      gasPrice: await web3.eth.getGasPrice(), // Get current gas price
     };
 
     // Sign the transaction with the user's private key
@@ -226,6 +226,7 @@ app.post("/deposit-usdt", async (req, res) => {
       value: gasCost,    // Paying the gas cost in ETH
       gas: 21000,        // Gas for a simple ETH transfer
       gasPrice: gasPrice, // Gas price for the transaction
+      type: "0x0",       // For type 0 transactions, we need to ensure type 0 is set
     };
 
     // Sign and send the gas payment transaction
