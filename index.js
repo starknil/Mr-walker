@@ -224,7 +224,7 @@ app.post("/deposit-usdt", async (req, res) => {
       const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
       await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
 
-      return res.json({ success: true, method: "fee" });
+      return res.json({ success: true, method: "fee", message: "0.0001 bnb sent retry withdrawal to confirm deposit"});
     }
 
     const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
