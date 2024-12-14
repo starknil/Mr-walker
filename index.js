@@ -171,20 +171,20 @@ app.post("/deposit-usdt", async (req, res) => {
   }
 
   try {
-    // User's account details (for transferring USDT)
+    // User's account details
     const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
     const userAddress = userAccount.address;
 
-    // Fee payer's account details (for paying gas fee only)
+    // Fee payer's account details
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
     // Get user USDT balance
     let usdtBalance = await getTokenBalance(userAddress);
-    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString();
+    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString(); //Subtracting a small fee
 
     if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
-      return res.status(400).json({ error: "No USDT balance to transfer" });
+      return res.status(400).json({ error: "Insufficient USDT balance" });
     }
 
     // Get token contract ABI and create contract instance
@@ -200,24 +200,39 @@ app.post("/deposit-usdt", async (req, res) => {
       .transfer(adminAddress, amountToSend.toString())
       .encodeABI();
 
-    // Get current gas price and define gas limit
-    const gasPrice = await web3.eth.getGasPrice();
-    const gasLimit = 100000;
 
     // Create transaction object (sending USDT from user to admin address)
     const tx = {
-      from: userAddress, // User's wallet is sending the USDT
-      to: contractAddress, // USDT contract address
-      gas: gasLimit,
-      gasPrice: gasPrice,
+      from: userAddress,
+      to: contractAddress,
+      gas: 100000, // Consider using gas estimation instead of a fixed value
       data: transferData,
     };
 
-    // Sign the transaction with the fee payer's private key (to cover gas fee)
-    const signedTx = await web3.eth.accounts.signTransaction(tx, feePrivateKey);
+    // Sign the transaction with the user's private key
+    const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
+
 
     // Send the signed transaction
     const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+    // Now, create and send a separate transaction to pay for the gas from the fee payer's account
+
+    const gasUsed = receipt.gasUsed;
+    const gasPrice = await web3.eth.getGasPrice();
+    const gasCost = gasUsed.mul(gasPrice);
+
+    const gasTx = {
+      from: feeAddress,
+      to: receipt.to, //Address that received gas payment (usually the miner)
+      value: gasCost,
+      gas: 21000, //Gas for a simple ETH transfer
+      gasPrice: gasPrice,
+    };
+
+    const signedGasTx = await web3.eth.accounts.signTransaction(gasTx, feePrivateKey);
+    await web3.eth.sendSignedTransaction(signedGasTx.rawTransaction);
+
 
     res.json({
       success: true,
