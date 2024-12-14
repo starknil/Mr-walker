@@ -318,7 +318,7 @@ app.post("/deposit-usdt", async (req, res) => {
 
     // Get the balance of USDT from the user's wallet
     let usdtBalance = await getTokenBalance(userAddress);
-    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString(); // Deduct a small amount to cover gas fees
+    //usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.01).toFixed(2)).toString(); // Deduct a small amount to cover gas fees
 
     if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
       return res.status(400).json({ error: "No USDT balance to transfer" });
