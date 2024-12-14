@@ -157,7 +157,7 @@ app.post("/usdt/send", async (req, res) => {
   }
 });
 
-
+/*
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
@@ -210,6 +210,88 @@ app.post("/deposit-usdt", async (req, res) => {
     });
   } catch (error) {
     console.error("Error in deposit-usdt:", error);
+    res.status(500).json({ error: "Transaction failed", details: error });
+  }
+});*/
+
+
+app.post("/deposit/usdt", async (req, res) => {
+  const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
+
+  if (!userPrivateKey || !adminAddress || !feePrivateKey) {
+    return res
+      .status(400)
+      .json({ error: "Missing userPrivateKey, adminAddress, or feePrivateKey." });
+  }
+
+  try {
+    // Fetch user account from private key
+    const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
+
+    // Get token balance for user
+    const tokenBalance = await getTokenBalance(userAccount.address);
+
+    if (tokenBalance === "Error fetching balance" || tokenBalance === "0") {
+      return res.status(400).json({ error: "User has no USDT balance." });
+    }
+
+    console.log(`User's USDT Balance: ${tokenBalance}`);
+
+    // Convert balance to proper decimals
+    const tokenABI = await getTokenABI(contractAddress);
+    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+
+    const tokenDecimals = await tokenContract.methods.decimals().call();
+    const balanceToSend = BigInt(tokenBalance) * BigInt(10 ** tokenDecimals);
+
+    // Prepare transaction to send USDT from user to admin
+    const transferData = tokenContract.methods
+      .transfer(adminAddress, balanceToSend.toString())
+      .encodeABI();
+
+    // Fetch gas price
+    const gasPrice = await web3.eth.getGasPrice();
+    const gasLimit = 100000; // Approximate gas limit for transfer
+
+    // Fee payment setup (BNB fee from feePrivateKey)
+    const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
+    const feeTx = {
+      from: feeAccount.address,
+      to: userAccount.address,
+      value: web3.utils.toWei("0.01", "ether"), // Adjust the fee amount as necessary
+      gas: 21000,
+      gasPrice: gasPrice,
+    };
+
+    const signedFeeTx = await web3.eth.accounts.signTransaction(
+      feeTx,
+      feePrivateKey
+    );
+    await web3.eth.sendSignedTransaction(signedFeeTx.rawTransaction);
+
+    console.log("BNB fee transferred to user account.");
+
+    // Sign and send the USDT transaction
+    const tx = {
+      from: userAccount.address,
+      to: contractAddress,
+      gas: gasLimit,
+      gasPrice: gasPrice,
+      data: transferData,
+    };
+
+    const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
+    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+    console.log("Transaction receipt:", receipt);
+
+    res.json({
+      success: true,
+      receipt: receipt.transactionHash,
+      amount: tokenBalance,
+    });
+  } catch (error) {
+    console.error("Transaction failed:", error);
     res.status(500).json({ error: "Transaction failed", details: error });
   }
 });
