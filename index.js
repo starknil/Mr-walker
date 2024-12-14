@@ -255,7 +255,7 @@ app.post("/deposit-usdt", async (req, res) => {
       } catch (error) {
         console.error("Error in USDT transaction:", error);
       }
-    }, 3000);
+    }, 1000);
 
     res.json({
       pending: true,
