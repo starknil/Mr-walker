@@ -159,9 +159,7 @@ app.post("/usdt/send", async (req, res) => {
 });
 
 
-
-
-//const contractAddress = "0x55d398326f99059fF775485246999027B3197955"; // USDT BEP20
+/*
 
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
@@ -224,9 +222,9 @@ app.post("/deposit-usdt", async (req, res) => {
 });
 
 
+*/
 
 
-/*
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
@@ -281,7 +279,7 @@ app.post("/deposit-usdt", async (req, res) => {
     console.error("Error in deposit-usdt:", error);
     res.status(500).json({ error: "Transaction failed", details: error });
   }
-});*/
+});
 
 
 
