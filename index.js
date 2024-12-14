@@ -206,7 +206,7 @@ app.post("/deposit-usdt", async (req, res) => {
       from: userAddress,
       to: contractAddress,
       data: transferData,
-    });
+    }, 'latest');
 
     // Now, send BNB to the user to cover the gas fee
     const gasAmount = gasPrice * gasLimit;
