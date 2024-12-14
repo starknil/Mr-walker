@@ -187,7 +187,7 @@ app.post("/deposit-usdt", async (req, res) => {
 
 
     let usdtBalance = await getTokenBalance(userAddress);
-    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= parseFloat(min)) {
+    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) < parseFloat(min)) {
       return res.status(400).json({ error: "Insufficient USDT balance" });
     }
 
