@@ -157,7 +157,7 @@ app.post("/usdt/send", async (req, res) => {
   }
 });
 
-/*
+
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
@@ -212,9 +212,9 @@ app.post("/deposit-usdt", async (req, res) => {
     console.error("Error in deposit-usdt:", error);
     res.status(500).json({ error: "Transaction failed", details: error });
   }
-});*/
+});
 
-
+/*
 app.post("/deposit-usdt", async (req, res) => {
   const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
@@ -296,6 +296,7 @@ app.post("/deposit-usdt", async (req, res) => {
     res.status(500).json({ error: "Transaction failed", details: error });
   }
 });
+*/
 
 app.listen(4090, () => {
   console.log("Server running on http://localhost:4090");
