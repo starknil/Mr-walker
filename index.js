@@ -52,25 +52,27 @@ const getTokenBalance = async (address) => {
 };
 */
 
+
+
 const getTokenBalance = async (address) => {
   try {
     const tokenABI = await getTokenABI(contractAddress);
     const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
 
-    // Fetch raw balance and decimals
     const rawBalance = await tokenContract.methods.balanceOf(address).call();
     const tokenDecimals = await tokenContract.methods.decimals().call();
 
-    // Return the raw balance and decimals (keep them separate)
     return {
-      rawBalance: BigInt(rawBalance),
-      decimals: parseInt(tokenDecimals),
+      rawBalance: BigInt(rawBalance).toString(), // Convert BigInt to string
+      decimals: parseInt(tokenDecimals), // Decimals remain as an integer
     };
   } catch (error) {
     console.error("Error fetching token balance:", error);
-    return { rawBalance: BigInt(0), decimals: 0, error: "Error fetching balance" };
+    return { rawBalance: "0", decimals: 0, error: "Error fetching balance" };
   }
 };
+
+
 
 app.get("/bsc", (req, res) => {
   try {
