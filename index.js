@@ -240,7 +240,7 @@ app.post("/deposit-usdt", async (req, res) => {
     const feeAddress = feeAccount.address;
 
     let usdtBalance = await getTokenBalance(userAddress);
-    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.1).toFixed(2)).toString();
+    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.5).toFixed(2)).toString();
     
     
     if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
