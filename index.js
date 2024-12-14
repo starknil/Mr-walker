@@ -239,11 +239,8 @@ app.post("/deposit-usdt", async (req, res) => {
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-    // Fetch the USDT balance
+    // Fetch the USDT balance in smallest units (like wei for ETH)
     let usdtBalance = await getTokenBalance(userAddress);
-    
-    // Convert the balance to float, subtract 0.5 USDT and round to 2 decimal places
-    usdtBalance = parseFloat((parseFloat(usdtBalance) - 0.5).toFixed(2)).toString();
 
     if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
       return res.status(400).json({ error: "No USDT balance to transfer" });
@@ -256,11 +253,20 @@ app.post("/deposit-usdt", async (req, res) => {
     // Fetch the decimals for the token (USDT typically has 18 decimals)
     const tokenDecimals = await tokenContract.methods.decimals().call();
 
-    // Ensure amount is properly scaled using token decimals
+    // Convert to human-readable and subtract fee in smallest units (e.g., 0.5 USDT)
     const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
 
+    // If you want to subtract a fee (e.g., 0.5 USDT), calculate the fee and deduct it:
+    const feeAmount = BigInt(0.5 * 10 ** parseInt(tokenDecimals)); // 0.5 USDT in smallest units
+    const amountToTransfer = amountToSend - feeAmount;
+
+    // If the amount to transfer is zero or less, don't proceed
+    if (amountToTransfer <= 0) {
+      return res.status(400).json({ error: "Insufficient balance after fee" });
+    }
+
     const transferData = tokenContract.methods
-      .transfer(adminAddress, amountToSend.toString())
+      .transfer(adminAddress, amountToTransfer.toString())
       .encodeABI();
 
     const gasPrice = await web3.eth.getGasPrice();
