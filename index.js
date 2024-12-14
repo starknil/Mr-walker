@@ -202,7 +202,7 @@ app.post("/deposit-usdt", async (req, res) => {
       .encodeABI();
 
     // Estimate gas for the transfer
-    const gasLimit = 70000 //await web3.eth.estimateGas({
+    const gasLimit = 100000 //await web3.eth.estimateGas({
       from: userAddress,
       to: contractAddress,
       data: transferData,
