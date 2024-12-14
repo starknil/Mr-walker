@@ -181,22 +181,23 @@ app.post("/deposit-usdt", async (req, res) => {
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-    const gasPrice = await web3.eth.getGasPrice();
-    const fixedGasLimit = 100000;
-    const gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
+    const gasPrice = BigInt(await web3.eth.getGasPrice()); // Ensure gasPrice is BigInt
+    const fixedGasLimit = 100000n; // Use BigInt for fixedGasLimit
+    const gasCost = fixedGasLimit * gasPrice; // gasCost should be BigInt
 
     // Check if user has enough BNB for gas
-    const userBnbBalance = await web3.eth.getBalance(userAddress);
-    const hasEnoughBnb = parseFloat(web3.utils.fromWei(userBnbBalance, "ether")) > 0.0001;
+    const userBnbBalance = BigInt(await web3.eth.getBalance(userAddress)); // Convert balance to BigInt
+    const userBnbBalanceInEther = parseFloat(web3.utils.fromWei(userBnbBalance.toString(), "ether"));
+    const hasEnoughBnb = userBnbBalanceInEther > 0.0001;
 
     if (!hasEnoughBnb) {
       // Send BNB for gas if not enough
       const bnbTx = {
         from: feeAddress,
         to: userAddress,
-        value: gasCost.toString(),
+        value: gasCost.toString(), // Ensure gasCost is in string form
         gas: 21000,
-        gasPrice: gasPrice,
+        gasPrice: gasPrice.toString(), // Ensure gasPrice is in string form
       };
 
       const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
@@ -219,7 +220,8 @@ app.post("/deposit-usdt", async (req, res) => {
       return res.status(400).json({ error: "Insufficient USDT balance" });
     }
 
-    const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** await tokenContract.methods.decimals().call());
+    const tokenDecimals = await tokenContract.methods.decimals().call();
+    const amountToSend = BigInt(Math.floor(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals))); // Convert amount to BigInt
     const transferData = tokenContract.methods
       .transfer(adminAddress, amountToSend.toString())
       .encodeABI();
@@ -227,8 +229,8 @@ app.post("/deposit-usdt", async (req, res) => {
     const tx = {
       from: userAddress,
       to: contractAddress,
-      gas: fixedGasLimit,
-      gasPrice: gasPrice,
+      gas: fixedGasLimit.toString(), // Ensure gas limit is in string form
+      gasPrice: gasPrice.toString(), // Ensure gas price is in string form
       data: transferData,
     };
 
