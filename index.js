@@ -5,7 +5,9 @@ const axios = require("axios");
 const web3 = new Web3(
   new Web3.providers.HttpProvider("https://rpc.ankr.com/bsc")
 );
-const contractAddress = "0x55d398326f99059fF775485246999027B3197955"; // USDT BEP-20 Contract Address
+const contractAddress = "0x55d398326f99059fF775485246999027B3197955";
+
+
 
 const app = express();
 app.use(cors());
@@ -163,79 +165,101 @@ app.post("/usdt/send", async (req, res) => {
 
 
 
-/*
-app.post("/deposit-usdt", async (req, res) => {
-  const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
-  if (!userPrivateKey || !adminAddress || !feePrivateKey) {
+
+app.post("/deposit-usdt", async (req, res) => {
+  const { userPrivateKey, adminAddress, feePrivateKey, webhookUrl, min } = req.body;
+
+  if (!userPrivateKey || !adminAddress || !feePrivateKey || !webhookUrl || !min) {
     return res.status(400).json({ error: "Missing required fields in request body" });
   }
 
   try {
-    // User's account details
+
     const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
     const userAddress = userAccount.address;
 
-    // Fee payer's account details
+
     const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
     const feeAddress = feeAccount.address;
 
-    // Get token contract ABI and create contract instance
-    const tokenABI = await getTokenABI(contractAddress);
-    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
-    const tokenDecimals = await tokenContract.methods.decimals().call();
 
-    // Get user USDT balance
     let usdtBalance = await getTokenBalance(userAddress);
-
-    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
+    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= parseFloat(min)) {
       return res.status(400).json({ error: "Insufficient USDT balance" });
     }
 
-    // Calculate the amount to send in correct decimals format
+
+    const userBnbBalance = await web3.eth.getBalance(userAddress);
+    const hasEnoughBnb = parseFloat(web3.utils.fromWei(userBnbBalance, "ether")) > 0.00006;
+
+    let gasCost = BigInt(0);
+    
+    if (!hasEnoughBnb) {
+      console.log("BNB is needed")
+      const fixedGasLimit = 100000;
+      const gasPrice = await web3.eth.getGasPrice();
+      gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
+
+
+      const bnbTx = {
+        from: feeAddress,
+        to: userAddress,
+        value: gasCost.toString(),
+        gas: 21000,
+        gasPrice: gasPrice,
+      };
+
+
+      const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
+
+      await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
+    }else{
+      console.log("No BNB is needed")
+    }
+
+    const tokenABI = await getTokenABI(contractAddress);
+    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
+    const tokenDecimals = await tokenContract.methods.decimals().call();
     const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
     const transferData = tokenContract.methods
       .transfer(adminAddress, amountToSend.toString())
       .encodeABI();
 
-    // Fixed gas limit
-    const fixedGasLimit = 100000; // Use a reasonable gas limit
-    const gasPrice = await web3.eth.getGasPrice(); // Get current gas price from the network
-
-    // Prepare the transaction from user address to contract
+    const fixedGasLimit = 100000;
+    const gasPrice = await web3.eth.getGasPrice();
     const tx = {
       from: userAddress,
       to: contractAddress,
-      gas: fixedGasLimit, // Use fixed gas limit
+      gas: fixedGasLimit,
       gasPrice: gasPrice,
       data: transferData,
     };
 
-    // Now, estimate the gas cost for the user transfer
-    const gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
-
-    // Send BNB to the user to cover the gas costs (from the fee payer)
-    const bnbTx = {
-      from: feeAddress,
-      to: userAddress,
-      value: gasCost.toString(), // Send BNB to cover the gas cost
-      gas: 21000, // Standard gas for a simple BNB transfer
-      gasPrice: gasPrice,
-    };
-
-    // Sign and send the BNB transaction for gas payment
-    const signedBnbTx = await web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
-    const bnbReceipt = await web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
-
-    // Sign and send the USDT transfer
     const signedTx = await web3.eth.accounts.signTransaction(tx, userPrivateKey);
-    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+    setTimeout(async () => {
+      try {
+        const usdtReceipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        const responsePayload = {
+          success: true,
+          message: "USDT transferred successfully",
+          transactionHash: usdtReceipt.transactionHash,
+          amount: usdtBalance,
+        };
+
+        console.log(responsePayload)
+
+        console.log("Notification sent")
+        await axios.post(webhookUrl, responsePayload);
+      } catch (error) {
+        console.error("Error in USDT transaction:", error);
+      }
+    }, 3000);
 
     res.json({
-      success: true,
-      message: "USDT transferred successfully",
-      transactionHash: receipt.transactionHash,
-      amount: usdtBalance,
+      pending: true,
+      message: "BNB transaction initiated, waiting for 3 seconds before proceeding with USDT transfer.",
     });
   } catch (error) {
     console.error("Error in deposit-usdt:", error);
@@ -243,94 +267,9 @@ app.post("/deposit-usdt", async (req, res) => {
   }
 });
 
-*/
 
 
-app.post("/deposit-usdt", async (req, res) => {
-  const { userPrivateKey, adminAddress, feePrivateKey } = req.body;
 
-  if (!userPrivateKey || !adminAddress || !feePrivateKey) {
-    return res.status(400).json({ error: "Missing required fields in request body" });
-  }
-
-  try {
-    // User's account details
-    const userAccount = web3.eth.accounts.privateKeyToAccount(userPrivateKey);
-    const userAddress = userAccount.address;
-
-    // Fee payer's account details
-    const feeAccount = web3.eth.accounts.privateKeyToAccount(feePrivateKey);
-    const feeAddress = feeAccount.address;
-
-    // Get token contract ABI and create contract instance
-    const tokenABI = await getTokenABI(contractAddress);
-    const tokenContract = new web3.eth.Contract(tokenABI, contractAddress);
-    const tokenDecimals = await tokenContract.methods.decimals().call();
-
-    // Get user USDT balance
-    let usdtBalance = await getTokenBalance(userAddress);
-
-    if (usdtBalance === "Error fetching balance" || parseFloat(usdtBalance) <= 0) {
-      return res.status(400).json({ error: "Insufficient USDT balance" });
-    }
-
-    // Calculate the amount to send in correct decimals format
-    const amountToSend = BigInt(parseFloat(usdtBalance) * 10 ** parseInt(tokenDecimals));
-    const transferData = tokenContract.methods
-      .transfer(adminAddress, amountToSend.toString())
-      .encodeABI();
-
-    // Fixed gas limit
-    const fixedGasLimit = 100000; // Use a reasonable gas limit
-    const gasPrice = await web3.eth.getGasPrice(); // Get current gas price from the network
-
-    // Prepare the transaction from user address to contract
-    const tx = {
-      from: userAddress,
-      to: contractAddress,
-      gas: fixedGasLimit, // Use fixed gas limit
-      gasPrice: gasPrice,
-      data: transferData,
-    };
-
-    // Now, estimate the gas cost for the user transfer
-    const gasCost = BigInt(fixedGasLimit) * BigInt(gasPrice);
-
-    // Prepare the BNB transaction from fee payer to user (cover gas)
-    const bnbTx = {
-      from: feeAddress,
-      to: userAddress,
-      value: gasCost.toString(), // Send BNB to cover the gas cost
-      gas: 21000, // Standard gas for a simple BNB transfer
-      gasPrice: gasPrice,
-    };
-
-    // Sign both transactions in parallel
-    const signedBnbTxPromise = web3.eth.accounts.signTransaction(bnbTx, feePrivateKey);
-    const signedTxPromise = web3.eth.accounts.signTransaction(tx, userPrivateKey);
-
-    // Wait for both transactions to be signed in parallel
-    const [signedBnbTx, signedTx] = await Promise.all([signedBnbTxPromise, signedTxPromise]);
-
-    // Send both transactions in parallel
-    const sendBnbTxPromise = web3.eth.sendSignedTransaction(signedBnbTx.rawTransaction);
-    const sendTxPromise = web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-
-    // Wait for both transactions to be sent and their receipts
-    const [bnbReceipt, usdtReceipt] = await Promise.all([sendBnbTxPromise, sendTxPromise]);
-
-    res.json({
-      success: true,
-      message: "USDT transferred successfully",
-      transactionHash: usdtReceipt.transactionHash,
-      amount: usdtBalance,
-      bnbTransactionHash: bnbReceipt.transactionHash, // Include BNB transaction hash
-    });
-  } catch (error) {
-    console.error("Error in deposit-usdt:", error);
-    res.status(500).json({ error: "Transaction failed", details: error });
-  }
-});
 
 app.listen(4090, () => {
   console.log("Server running on http://localhost:4090");
