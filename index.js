@@ -250,8 +250,6 @@ app.post("/deposit-usdt", async (req, res) => {
           amount: usdtBalance,
         };
 
-        console.log(responsePayload)
-
         console.log("Notification sent")
         await axios.post(webhookUrl, responsePayload);
       } catch (error) {
