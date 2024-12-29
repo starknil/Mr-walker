@@ -130,7 +130,7 @@ app.post("/usdt/send", async (req, res) => {
 
     const gasPrice = await web3.eth.getGasPrice();
 
-    const gasLimit = 100000;
+    const gasLimit = 110000;
 
     const tx = {
       from: account.address,
